@@ -315,8 +315,9 @@ class _ModernFormStepperState extends State<ModernFormStepper>
       (int i) => GlobalKey(),
     );
 
-    for (int i = 0; i < widget.steps.length; i += 1)
+    for (int i = 0; i < widget.steps.length; i += 1) {
       _oldStates[i] = widget.steps[i].state;
+    }
   }
 
   @override
@@ -324,8 +325,9 @@ class _ModernFormStepperState extends State<ModernFormStepper>
     super.didUpdateWidget(oldWidget);
     assert(widget.steps.length == oldWidget.steps.length);
 
-    for (int i = 0; i < oldWidget.steps.length; i += 1)
+    for (int i = 0; i < oldWidget.steps.length; i += 1) {
       _oldStates[i] = oldWidget.steps[i].state;
+    }
   }
 
   bool _isFirst(int index) {
@@ -459,15 +461,16 @@ class _ModernFormStepperState extends State<ModernFormStepper>
         duration: kThemeAnimationDuration,
       );
     } else {
-      if (widget.steps[index].state != ModernFormStepState.error)
+      if (widget.steps[index].state != ModernFormStepState.error) {
         return _buildCircle(index, false);
-      else
+      } else {
         return _buildTriangle(index, false);
+      }
     }
   }
 
   Widget _buildVerticalControls(int stepIndex) {
-    if (widget.controlsBuilder != null)
+    if (widget.controlsBuilder != null) {
       return widget.controlsBuilder!(
         context,
         ControlsDetails(
@@ -477,6 +480,7 @@ class _ModernFormStepperState extends State<ModernFormStepper>
           stepIndex: stepIndex,
         ),
       );
+    }
 
     final Color cancelColor;
     switch (Theme.of(context).brightness) {
@@ -772,7 +776,7 @@ class _ModernFormStepperState extends State<ModernFormStepper>
       children: <Widget>[
         Material(
           elevation: widget.elevation ?? 2,
-          child: Container(
+          child: SizedBox(
             // margin: const EdgeInsets.symmetric(horizontal: 24.0),
             height: widget.height ?? 50,
             child: ListView(
