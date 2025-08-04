@@ -323,11 +323,30 @@ class _ModernFormStepperState extends State<ModernFormStepper>
   @override
   void didUpdateWidget(ModernFormStepper oldWidget) {
     super.didUpdateWidget(oldWidget);
-    assert(widget.steps.length == oldWidget.steps.length);
 
-    for (int i = 0; i < oldWidget.steps.length; i += 1) {
-      _oldStates[i] = oldWidget.steps[i].state;
+    // Se o número de steps mudou, precisamos recriar as keys
+    if (widget.steps.length != oldWidget.steps.length) {
+      _keys = List<GlobalKey>.generate(
+        widget.steps.length,
+        (int i) => GlobalKey(),
+      );
     }
+
+    // Atualiza _oldStates apenas para os steps que existiam antes
+    // Para novos steps, usa o estado atual como estado "antigo"
+    final Map<int, ModernFormStepState> newOldStates =
+        <int, ModernFormStepState>{};
+    for (int i = 0; i < widget.steps.length; i += 1) {
+      if (i < oldWidget.steps.length) {
+        // Step existia antes, usa o estado do widget antigo
+        newOldStates[i] = oldWidget.steps[i].state;
+      } else {
+        // Step novo, usa o estado atual como "antigo" para evitar animações desnecessárias
+        newOldStates[i] = widget.steps[i].state;
+      }
+    }
+    _oldStates.clear();
+    _oldStates.addAll(newOldStates);
   }
 
   bool _isFirst(int index) {
