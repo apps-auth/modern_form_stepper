@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-part of modern_form_stepper;
+part of '../modern_form_stepper.dart';
 
 //   * mobile horizontal mode with adding/removing steps
 //   * alternative labeling
@@ -182,7 +182,7 @@ class ModernFormStepper extends StatefulWidget {
   ///
   /// The [steps], [type], and [currentStep] arguments must not be null.
   const ModernFormStepper({
-    Key? key,
+    super.key,
     required this.steps,
     this.physics,
     this.type = ModernFormStepperType.vertical,
@@ -195,8 +195,7 @@ class ModernFormStepper extends StatefulWidget {
     this.margin,
     this.height,
     this.scrollController,
-  })  : assert(0 <= currentStep && currentStep < steps.length),
-        super(key: key);
+  })  : assert(0 <= currentStep && currentStep < steps.length);
 
   /// The steps of the stepper whose titles, subtitles, icons always get shown.
   ///
@@ -408,11 +407,11 @@ class _ModernFormStepperState extends State<ModernFormStepper>
     if (!_isDark()) {
       return widget.steps[index].isActive
           ? colorScheme.primary
-          : colorScheme.onSurface.withOpacity(0.38);
+          : colorScheme.onSurface.withAlpha((0.38 * 255).round());
     } else {
       return widget.steps[index].isActive
           ? colorScheme.secondary
-          : colorScheme.background;
+          : colorScheme.surface;
     }
   }
 
@@ -533,16 +532,16 @@ class _ModernFormStepperState extends State<ModernFormStepper>
               onPressed: widget.onStepContinue,
               style: ButtonStyle(
                 foregroundColor: WidgetStateProperty.resolveWith<Color?>(
-                    (Set<MaterialState> states) {
-                  return states.contains(MaterialState.disabled)
+                    (Set<WidgetState> states) {
+                  return states.contains(WidgetState.disabled)
                       ? null
                       : (_isDark()
                           ? colorScheme.onSurface
                           : colorScheme.onPrimary);
                 }),
                 backgroundColor: WidgetStateProperty.resolveWith<Color?>(
-                    (Set<MaterialState> states) {
-                  return _isDark() || states.contains(MaterialState.disabled)
+                    (Set<WidgetState> states) {
+                  return _isDark() || states.contains(WidgetState.disabled)
                       ? null
                       : colorScheme.primary;
                 }),
@@ -816,8 +815,8 @@ class _ModernFormStepperState extends State<ModernFormStepper>
                 curve: Curves.fastOutSlowIn,
                 duration: kThemeAnimationDuration,
                 child: Column(
-                    children: stepPanels,
-                    crossAxisAlignment: CrossAxisAlignment.stretch),
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: stepPanels),
               ),
               _buildVerticalControls(widget.currentStep),
             ],
