@@ -1,6 +1,6 @@
 name: modern_form_stepper
 description: A flutter stepper widget with customizations
-version: 2.1.0
+version: 2.2.0
 homepage: https://github.com/apps-auth/modern_form_stepper
 
 environment:
