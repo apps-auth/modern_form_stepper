@@ -7,16 +7,25 @@ class ModernFormTimeline extends StatefulWidget {
   final List<ModernFormStep> steps;
 
   /// Quantos steps mostrar por padrão (os mais recentes).
-  final int defaultVisible;
+  ///
+  /// Quando não informado, a timeline não oculta etapas e exibe todos os
+  /// itens sem botão de expansão/recolhimento.
+  final int? defaultVisible;
 
   /// Cor usada nos steps já concluídos.
   /// Se não fornecida, usa [ColorScheme.secondary] do tema.
   final Color? completedColor;
 
+  /// Índice da etapa atual para realce visual no timeline.
+  ///
+  /// Quando informado, tem prioridade sobre [ModernFormStep.isActive].
+  final int? currentStepIndex;
+
   const ModernFormTimeline({
     required this.steps,
-    this.defaultVisible = 3,
+    this.defaultVisible,
     this.completedColor,
+    this.currentStepIndex,
     super.key,
   });
 
@@ -29,36 +38,68 @@ class _ModernFormTimelineState extends State<ModernFormTimeline> {
 
   /// Índice dentro de widget.steps do item selecionado (-1 = nenhum).
   int _selectedIndex = -1;
+  bool _hasUserSelection = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedIndex = _initialSelectedIndex();
+  }
+
+  int _initialSelectedIndex() {
+    if (widget.steps.isEmpty) return -1;
+    final int lastIndex = widget.steps.length - 1;
+    return _isEffectivelyEmptyContent(widget.steps[lastIndex].content)
+        ? -1
+        : lastIndex;
+  }
 
   @override
   void didUpdateWidget(ModernFormTimeline old) {
     super.didUpdateWidget(old);
     if (!identical(old.steps, widget.steps)) {
-      _selectedIndex = -1;
+      _selectedIndex = _initialSelectedIndex();
+      _hasUserSelection = false;
       // Recolhe automaticamente se a lista encolher abaixo do limite visível,
       // evitando que _expanded fique true sem botão de recolher visível.
-      if (widget.steps.length <= widget.defaultVisible) {
+      if (!_canHideSteps) {
         _expanded = false;
       }
     }
   }
 
-  bool get _hasHidden =>
-      !_expanded && widget.steps.length > widget.defaultVisible;
+  bool get _canHideSteps =>
+      widget.defaultVisible != null && widget.steps.length > widget.defaultVisible!;
 
-  int get _hiddenCount => widget.steps.length - widget.defaultVisible;
+  bool get _hasHidden => !_expanded && _canHideSteps;
+
+  int get _hiddenCount => widget.steps.length - widget.defaultVisible!;
 
   List<ModernFormStep> get _visibleSteps => _hasHidden
-      ? widget.steps.sublist(widget.steps.length - widget.defaultVisible)
+      ? widget.steps.sublist(widget.steps.length - widget.defaultVisible!)
       : widget.steps;
 
   int _globalIndex(int visibleIndex) => _hasHidden
-      ? widget.steps.length - widget.defaultVisible + visibleIndex
+      ? widget.steps.length - widget.defaultVisible! + visibleIndex
       : visibleIndex;
+
+  int get _resolvedCurrentStepIndex {
+    final external = widget.currentStepIndex;
+    if (external != null && external >= 0 && external < widget.steps.length) {
+      return external;
+    }
+
+    // Fallback para compatibilidade: usa a primeira etapa marcada como ativa.
+    for (var i = 0; i < widget.steps.length; i++) {
+      if (widget.steps[i].isActive) return i;
+    }
+    return -1;
+  }
 
   void _onTapItem(int globalIndex) {
     setState(() {
-      _selectedIndex = _selectedIndex == globalIndex ? -1 : globalIndex;
+      _selectedIndex = globalIndex;
+      _hasUserSelection = true;
     });
   }
 
@@ -66,13 +107,21 @@ class _ModernFormTimelineState extends State<ModernFormTimeline> {
     setState(() {
       _expanded = false;
       _selectedIndex = -1;
+      _hasUserSelection = false;
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final visibleSteps = _visibleSteps;
-    final bool showExpandControls = widget.steps.length > widget.defaultVisible;
+    final bool showExpandControls = _canHideSteps;
+    final int processCurrentStepIndex = _resolvedCurrentStepIndex;
+    final int highlightedStepIndex =
+        _hasUserSelection && _selectedIndex >= 0
+            ? _selectedIndex
+            : processCurrentStepIndex;
+    final int expandedStepIndex =
+        _selectedIndex >= 0 ? _selectedIndex : processCurrentStepIndex;
 
     return Padding(
       padding: const EdgeInsets.only(top: 6.0, bottom: 4.0),
@@ -89,11 +138,13 @@ class _ModernFormTimelineState extends State<ModernFormTimeline> {
             _TimelineRecolherButton(onTap: _collapse),
           ...List.generate(visibleSteps.length, (i) {
             final gi = _globalIndex(i);
+            final bool isExpandedItem = gi == expandedStepIndex;
             return _TimelineItem(
               step: visibleSteps[i],
               isFirst: i == 0 && _hasHidden,
               isLast: i == visibleSteps.length - 1,
-              isSelected: _selectedIndex == gi,
+              isCurrent: gi == highlightedStepIndex,
+              isSelected: isExpandedItem,
               completedColor: widget.completedColor,
               onTap: () => _onTapItem(gi),
             );
@@ -188,6 +239,7 @@ class _TimelineItem extends StatelessWidget {
   final ModernFormStep step;
   final bool isLast;
   final bool isFirst;
+  final bool isCurrent;
   final bool isSelected;
   final VoidCallback onTap;
   final Color? completedColor;
@@ -195,6 +247,7 @@ class _TimelineItem extends StatelessWidget {
   const _TimelineItem({
     required this.step,
     required this.isLast,
+    required this.isCurrent,
     required this.isSelected,
     required this.onTap,
     this.isFirst = false,
@@ -208,7 +261,6 @@ class _TimelineItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isCurrent = step.isActive;
     final dotSize = isCurrent ? _dotSizeCurrent : _dotSizeNormal;
     final resolved = completedColor ?? theme.colorScheme.secondary;
     final dotColor = isCurrent ? theme.colorScheme.primary : resolved;
@@ -288,9 +340,10 @@ class _TimelineItem extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Nome — só clicável se houver descrição para mostrar
-                  if (step.content != null)
-                    GestureDetector(
+                  // Nome — sempre clicável para permitir seleção da etapa.
+                  MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: GestureDetector(
                       onTap: onTap,
                       behavior: HitTestBehavior.translucent,
                       child: DefaultTextStyle.merge(
@@ -302,17 +355,8 @@ class _TimelineItem extends StatelessWidget {
                         ),
                         child: step.title,
                       ),
-                    )
-                  else
-                    DefaultTextStyle.merge(
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: titleColor,
-                        height: 1.3,
-                      ),
-                      child: step.title,
                     ),
+                  ),
                   // Data + responsável
                   if (step.subtitle != null) ...[
                     const SizedBox(height: 2),
@@ -325,8 +369,8 @@ class _TimelineItem extends StatelessWidget {
                       child: step.subtitle!,
                     ),
                   ],
-                  // Só renderiza descrição se houver conteúdo
-                  if (step.content != null)
+                  // Só renderiza descrição se houver conteúdo de fato.
+                  if (!_isEffectivelyEmptyContent(step.content))
                     _TimelineStepDescription(
                       content: step.content!,
                       isExpanded: isSelected,
@@ -342,6 +386,40 @@ class _TimelineItem extends StatelessWidget {
       ),
     );
   }
+}
+
+bool _isEffectivelyEmptyContent(Widget? content) {
+  if (content == null) return true;
+
+  if (content is SizedBox) {
+    return content.child == null;
+  }
+
+  if (content is Text) {
+    final String plainTextFromData = (content.data ?? '').trim();
+    final String plainTextFromSpan = content.textSpan
+            ?.toPlainText(
+              includeSemanticsLabels: false,
+              includePlaceholders: false,
+            )
+            .trim() ??
+        '';
+    return plainTextFromData.isEmpty && plainTextFromSpan.isEmpty;
+  }
+
+  if (content is Row) {
+    return content.children.isEmpty;
+  }
+
+  if (content is Column) {
+    return content.children.isEmpty;
+  }
+
+  if (content is Flex) {
+    return content.children.isEmpty;
+  }
+
+  return false;
 }
 
 // ── Descrição expansível ──────────────────────────────────────────────────────
